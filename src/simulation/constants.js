@@ -1,51 +1,43 @@
 // src/simulation/constants.js
 
 export const SCENARIOS = {
-    OPTIMISTA: { id: 'OPTIMISTA', factor: 1.0, name: "Escenario Ideal (Sin Socavón)", mode: 'DOUBLE_LANE', accidentProb: 0 },
-    REAL: { id: 'REAL', factor: 1.5, name: "Escenario Real (Paso Regulado)", mode: 'REVERSIBLE', accidentProb: 0.001 },
-    PESIMISTA: { id: 'PESIMISTA', factor: 2.0, name: "Escenario Caos (Lluvia/Accidentes)", mode: 'REVERSIBLE', accidentProb: 0.008 }
+    OPTIMISTA: { id: 'OPTIMISTA', factor: 1.0, name: "Escenario Ideal (Sin Socavón)", mode: 'DOUBLE_LANE', rainChance: 0 },
+    REAL: { id: 'REAL', factor: 1.4, name: "Escenario Real (Paso Regulado)", mode: 'REVERSIBLE', rainChance: 0.3 },
+    PESIMISTA: { id: 'PESIMISTA', factor: 1.8, name: "Escenario Caos (Colapso/Lluvia)", mode: 'REVERSIBLE', rainChance: 0.8 }
 };
 
 export const VEHICLE_TYPES = {
-    MOTO: { id: 'moto', label: 'Moto', speed: 85, length: 3, color: 'text-purple-400', rank: 5, canOvertake: true, passengers: 2 },
-    CAR: { id: 'car', label: 'Liviano', speed: 70, length: 5, color: 'text-blue-400', rank: 4, canOvertake: true, passengers: 5 },
-    PICKUP: { id: 'pickup', label: 'Pick-up', speed: 65, length: 6, color: 'text-emerald-600', rank: 3, isCargo: true, canOvertake: false, passengers: 3 },
-    BUS: { id: 'bus', label: 'Bus', speed: 55, length: 12, color: 'text-yellow-500', rank: 2, canOvertake: true, passengers: 50 }, // Buses llevan mucha gente y carga
-    TRUCK: { id: 'truck', label: 'Camión', speed: 40, length: 14, color: 'text-orange-600', isCargo: true, rank: 1, canOvertake: false, passengers: 2 },
+    MOTO: { id: 'moto', label: 'Moto', maxSpeed: 90, accel: 3, decel: 4, length: 2.5, color: 'text-purple-500', rank: 5, passengers: 2 },
+    CAR: { id: 'car', label: 'Liviano', maxSpeed: 75, accel: 2, decel: 3, length: 4.5, color: 'text-blue-500', rank: 4, passengers: 4 },
+    PICKUP: { id: 'pickup', label: 'Pick-up', maxSpeed: 65, accel: 1.8, decel: 2.5, length: 5.5, color: 'text-emerald-600', rank: 3, isCargo: true, passengers: 3 },
+    BUS: { id: 'bus', label: 'Bus Extraurbano', maxSpeed: 55, accel: 1.2, decel: 2, length: 12, color: 'text-yellow-500', rank: 2, passengers: 45 },
+    TRUCK: { id: 'truck', label: 'Transporte Pesado', maxSpeed: 40, accel: 0.8, decel: 1.5, length: 16, color: 'text-orange-600', isCargo: true, rank: 1, passengers: 2 },
 };
 
-// maxLife: Tiempo en horas antes de perder calidad crítica (si es perecedero)
 export const CARGO_TYPES = [
-    { name: "Verduras (Almolonga)", value: 15000, perishable: true, maxLife: 6 }, 
-    { name: "Material Construcción", value: 25000, perishable: false, maxLife: null },
-    { name: "Combustible", value: 80000, perishable: false, maxLife: null },
-    { name: "Paquetería", value: 40000, perishable: false, maxLife: null },
-    { name: "Ganado", value: 60000, perishable: true, maxLife: 8 }, // Estrés animal
-    { name: "Bebidas", value: 20000, perishable: false, maxLife: null },
-    { name: "Mariscos (Costa)", value: 35000, perishable: true, maxLife: 4 } // Muy crítico
+    { name: "Verduras (Almolonga)", value: 18000, perishable: true, decayRate: 0.1 }, 
+    { name: "Material Construcción", value: 35000, perishable: false, decayRate: 0 },
+    { name: "Combustible", value: 95000, perishable: false, decayRate: 0 },
+    { name: "Abarrotes/Varios", value: 45000, perishable: false, decayRate: 0 },
+    { name: "Ganado", value: 75000, perishable: true, decayRate: 0.2 }, 
 ];
 
 export const ROAD = {
-    LENGTH: 1000,
-    BOTTLENECK_START: 400,
-    BOTTLENECK_END: 600,
-    STOP_LINE_XELA: 350,   
-    STOP_LINE_REU: 650,    
-    SAFE_DISTANCE: 25,
-    OVERTAKE_BUFFER: 25, 
-    SIGHT_DISTANCE: 300, 
-    ACCIDENT_DURATION: 15000,
-    BREAKDOWN_DURATION: 20000
+    LENGTH: 1200, // Metros virtuales
+    BOTTLENECK_START: 450,
+    BOTTLENECK_END: 750,
+    STOP_LINE_XELA: 400,   
+    STOP_LINE_REU: 800,    
+    SAFE_DISTANCE: 20, // Distancia deseada en metros
+    TIME_HEADWAY: 1.5, // Segundos de distancia al coche de enfrente
+    ACCIDENT_DURATION: 30000, // ms que dura un choque en pantalla
+    BREAKDOWN_DURATION: 25000
 };
 
-export const RUSH_HOURS = [
-    { start: 7.5, end: 10.0, factor: 3.5 },
-    { start: 13.0, end: 15.0, factor: 3.0 },
-    { start: 18.0, end: 20.0, factor: 2.8 }
-];
-
-export const ACCIDENT_RATES = {
-    BASE_CHANCE: 0.00006, 
-    RAIN_MULTIPLIER: 0.000012, 
-    OVERTAKE_RISK: 0.01 
+// Costos en Quetzales
+export const COSTS = {
+    FUEL_IDLE_PER_HOUR: 25, // Q por hora en ralentí
+    FUEL_MOVING_PER_KM: 4.5, // Q por km
+    TIME_VALUE_PASSENGER: 35, // Q por hora por persona (productividad)
+    OPPORTUNITY_COST_TRUCK: 200 // Q por hora detenido (camión)
 };
