@@ -2,8 +2,7 @@
 import React, { useState } from 'react';
 import * as XLSX from 'xlsx'; 
 import jsPDF from 'jspdf'; 
-import 'jspdf-autotable'; 
-// CORRECCIÓN: Se agregó ShieldAlert a los imports
+import autoTable from 'jspdf-autotable'; 
 import { Play, Pause, RotateCcw, Download, FileText, CloudRain, Activity, DollarSign, ShieldAlert } from 'lucide-react';
 import { AreaChart, Area, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import RoadVisualizer from './RoadVisualizer';
@@ -16,7 +15,8 @@ const Dashboard = () => {
   const [isRunning, setIsRunning] = useState(false);
   const [resetCount, setResetCount] = useState(0);
 
-  const { vehicles, trafficState, simTime, stats, currentRisk, accidentReport, historyLog, accidentLog, breakdownAlert } = useSimulationEngine(activeScenario, isRunning, config, resetCount);
+  // AGREGADO: dayCount en la desestructuración para arreglar el bug del día
+  const { vehicles, trafficState, simTime, dayCount, stats, currentRisk, accidentReport, historyLog, accidentLog, breakdownAlert } = useSimulationEngine(activeScenario, isRunning, config, resetCount);
 
   // --- EXPORTAR EXCEL ---
   const exportExcel = () => {
@@ -45,7 +45,7 @@ const Dashboard = () => {
       XLSX.writeFile(wb, `Simulacion_CitoZarco_${Date.now()}.xlsx`);
   };
 
-  // --- EXPORTAR PDF ---
+  // --- EXPORTAR PDF MODIFICADO ---
   const exportPDF = () => {
       const doc = new jsPDF();
       doc.text("Reporte de Incidentes Viales - Ruta Cito-Zarco", 14, 20);
@@ -55,10 +55,21 @@ const Dashboard = () => {
       if (accidentLog.current.length === 0) {
           doc.text("No se registraron accidentes durante la simulación.", 14, 40);
       } else {
-          doc.autoTable({
+          // MODIFICADO: Agregadas columnas de Ocupantes y Heridos
+          autoTable(doc, {
               startY: 35,
-              head: [['Hora', 'Vehículo', 'Causa', 'Pérdida (Q)']],
-              body: accidentLog.current.map(acc => [acc.time, acc.type, acc.cause, acc.cost.toLocaleString()]),
+              head: [['Hora', 'Vehículo', 'Causa', 'Ocup.', 'Heridos', 'Pérdida (Q)']],
+              body: accidentLog.current.map(acc => [
+                  acc.time, 
+                  acc.type, 
+                  acc.cause, 
+                  acc.passengers, // Cantidad de ocupantes
+                  acc.injured,    // Cantidad de heridos
+                  `Q ${acc.cost.toLocaleString()}` // Formato explícito de Quetzales
+              ]),
+              theme: 'grid',
+              styles: { fontSize: 8 },
+              headStyles: { fillColor: [220, 38, 38] }
           });
       }
       doc.save(`Reporte_Accidentes_${Date.now()}.pdf`);
@@ -75,7 +86,8 @@ const Dashboard = () => {
               <div className="text-3xl">💥</div>
               <div>
                   <h3 className="font-bold text-lg">ACCIDENTE REPORTADO</h3>
-                  <p className="text-sm">Pérdidas Est: Q{accidentReport.cost.toLocaleString()}</p>
+                  {/* MODIFICADO: Mostrar heridos en la alerta en pantalla también */}
+                  <p className="text-sm">Pérdidas: Q{accidentReport.cost.toLocaleString()} | Heridos: {accidentReport.injured}</p>
               </div>
           </div>
       )}
@@ -93,7 +105,8 @@ const Dashboard = () => {
               <h1 className="text-2xl font-black text-slate-800">Simulador Cito-Zarco <span className="text-indigo-600">Km 194</span></h1>
               <div className="flex gap-4 mt-1 text-sm text-slate-500 font-mono">
                   <span className="flex items-center gap-1 bg-slate-100 px-2 rounded"><Activity size={14}/> {formatTime(simTime)}</span>
-                  <span className="flex items-center gap-1 bg-slate-100 px-2 rounded">Día {simTime ? Math.floor((Date.now()/1000)) : 1}</span>
+                  {/* CORRECCIÓN BUG DÍA: Usamos dayCount en vez de Date.now() */}
+                  <span className="flex items-center gap-1 bg-slate-100 px-2 rounded">Día {dayCount}</span>
               </div>
           </div>
           <a href="https://github.com/ByFer12/simulation_cito-zarco.git" target="_blank" rel="noopener noreferrer" className="text-indigo-600 hover:underline">Repositorio GitHub</a>
@@ -156,7 +169,7 @@ const Dashboard = () => {
                   </div>
               </div>
 
-              {/* KPI RIESGO (Aquí estaba el error) */}
+              {/* KPI RIESGO */}
               <div className={`p-5 rounded-xl shadow-lg text-white transition-colors duration-500 ${currentRisk > 70 ? 'bg-red-600' : currentRisk > 30 ? 'bg-orange-500' : 'bg-emerald-500'}`}>
                   <div className="flex justify-between items-start">
                       <div>
@@ -187,6 +200,7 @@ const Dashboard = () => {
                           <DollarSign size={18} className="text-green-600"/>
                           <span className="text-xs font-bold uppercase">Pérdida Económica</span>
                       </div>
+                      {/* Formato Q Quetzales */}
                       <p className="text-2xl font-black text-slate-800">Q {stats.totalCost.toLocaleString(undefined, {maximumFractionDigits:0})}</p>
                       <p className="text-xs text-slate-400 mt-1">Combustible + Oportunidad</p>
                   </div>

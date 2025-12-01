@@ -1,24 +1,31 @@
 // src/components/RoadVisualizer.jsx
 import React, { useState } from 'react';
-import { Truck, Car, Bus, Bike, AlertTriangle, Construction, Flame, Wrench, Info, Package, Users, Droplets, DollarSign } from 'lucide-react';
+import { Truck, Car, Bus, Bike, AlertTriangle, Construction, Flame, Wrench, Info, Package, Users, Droplets, DollarSign, Gauge } from 'lucide-react';
 import { ROAD } from '../simulation/constants';
-
 
 const RoadVisualizer = ({ 
     vehicles = [], 
-    trafficState, // No confiamos en el valor por defecto de props aquí
+    trafficState, 
     weatherIntensity = 0, 
     scenarioMode = 'REAL' 
 }) => {
   
   const [hoveredVehicle, setHoveredVehicle] = useState(null);
 
-  // --- CORRECCIÓN DEFINITIVA DE SEGURIDAD ---
-  // Creamos un objeto de respaldo local. Si trafficState es null o undefined, usa este.
+  // Seguridad por si trafficState es null al inicio
   const safeTraffic = trafficState || { 
       lightXela: 'GREEN', 
       lightReu: 'GREEN', 
       phase: 'OPEN' 
+  };
+
+  // Diccionario para nombres más bonitos en pantalla
+  const VEHICLE_LABELS = {
+      'TRUCK': 'Tráiler Pesado',
+      'BUS': 'Bus Extraurbano',
+      'CAR': 'Vehículo Liviano',
+      'MOTO': 'Motocicleta',
+      'PICKUP': 'Pick-up Agrícola'
   };
 
   const renderVehicleBody = (v) => {
@@ -33,49 +40,76 @@ const RoadVisualizer = ({
     }
   };
 
+  // Prepara la info del vehículo seleccionado
+  const info = hoveredVehicle ? {
+      label: VEHICLE_LABELS[hoveredVehicle.type] || hoveredVehicle.type,
+      speed: Math.round(hoveredVehicle.v * 3.6), // Convertir m/s a km/h para visualización
+      passengers: hoveredVehicle.passengers || 1, // Viene del spread ...proto en engine.js
+      // Si no existe accumulatedCost en el engine, usamos 0.
+      tripCost: hoveredVehicle.accumulatedCost || 0, 
+      cargoName: hoveredVehicle.cargo?.name || 'Sin Carga Comercial',
+      cargoValue: hoveredVehicle.cargo?.currentValue || 0,
+      isPerishable: hoveredVehicle.cargo?.perishable || false,
+      totalValue: (hoveredVehicle.cargo?.currentValue || 0) + (hoveredVehicle.accumulatedCost || 0)
+  } : null;
+
   return (
     <div className="relative w-full h-80 bg-stone-300 overflow-hidden rounded-xl border-4 border-gray-800 shadow-2xl">
       
-      {/* TOOLTIP / POPOVER */}
-      {hoveredVehicle && hoveredVehicle.info && (
-          <div className="absolute z-50 bg-slate-900/95 text-white p-4 rounded-lg shadow-xl backdrop-blur-sm border border-slate-700 w-64 pointer-events-none"
-               style={{ top: '10px', left: '10px' }}>
-              <div className="flex items-center justify-between border-b border-gray-600 pb-2 mb-2">
-                  <h4 className="font-bold uppercase text-yellow-400 text-sm flex items-center gap-2">
-                      <Info size={14}/> {hoveredVehicle.label}
-                  </h4>
-                  <span className="text-xs bg-slate-700 px-2 rounded">{hoveredVehicle.uid.toString().slice(-4)}</span>
+      {/* TOOLTIP HUD MEJORADO */}
+      {info && (
+          <div className="absolute z-50 bg-slate-900/95 text-white p-4 rounded-xl shadow-2xl backdrop-blur-md border border-slate-600 w-72 pointer-events-none transition-opacity duration-200"
+               style={{ top: '12px', left: '12px' }}>
+              
+              {/* Encabezado */}
+              <div className="flex items-center justify-between border-b border-gray-600 pb-2 mb-3">
+                  <div className="flex items-center gap-2">
+                      <div className={`p-1.5 rounded-lg ${hoveredVehicle.type === 'TRUCK' ? 'bg-orange-500/20 text-orange-400' : 'bg-blue-500/20 text-blue-400'}`}>
+                          <Info size={16}/>
+                      </div>
+                      <div>
+                          <h4 className="font-bold text-sm leading-tight">{info.label}</h4>
+                          <span className="text-[10px] text-gray-400 font-mono">ID: {hoveredVehicle.uid.toString().slice(-6)}</span>
+                      </div>
+                  </div>
+                  <div className="text-right">
+                      <div className="flex items-center justify-end gap-1 text-emerald-400 font-mono font-bold text-sm">
+                          <Gauge size={14}/> {info.speed} <span className="text-[10px]">km/h</span>
+                      </div>
+                  </div>
               </div>
               
-              <div className="space-y-2 text-xs">
-                  <div className="flex justify-between items-center">
-                      <span className="text-gray-400 flex items-center gap-2"><Users size={12}/> Pasajeros:</span>
-                      <span className="font-bold">{hoveredVehicle.info.passengers}</span>
+              {/* Cuerpo de Datos */}
+              <div className="space-y-3 text-xs">
+                  
+                  {/* Fila 1: Pasajeros y Costo Viaje */}
+                  <div className="grid grid-cols-2 gap-2">
+                      <div className="bg-slate-800/50 p-2 rounded border border-slate-700">
+                          <span className="text-gray-400 flex items-center gap-1.5 mb-1"><Users size={12}/> Ocupantes</span>
+                          <span className="font-bold text-lg">{info.passengers}</span>
+                      </div>
+                      <div className="bg-slate-800/50 p-2 rounded border border-slate-700">
+                          <span className="text-gray-400 flex items-center gap-1.5 mb-1"><DollarSign size={12}/> Gasto Oper.</span>
+                          <span className="font-bold text-lg text-yellow-500">Q{Math.round(info.tripCost)}</span>
+                      </div>
                   </div>
                   
-                  {hoveredVehicle.info.cargo && (
-                      <div className="bg-slate-800 p-2 rounded border border-slate-600 mt-1">
-                          <p className="text-gray-400 flex items-center gap-2 mb-1"><Package size={12}/> Carga:</p>
-                          <p className="font-bold text-emerald-400 truncate">{hoveredVehicle.info.cargo.name}</p>
-                          <p className="text-[10px] text-gray-500 mt-1">
-                              Valor: Q{hoveredVehicle.info.cargo.currentValue?.toLocaleString() || 0}
-                          </p>
-                          {hoveredVehicle.info.cargo.perishable && (
-                              <p className="text-[10px] text-red-400 mt-1">
-                                  ⚠ Perecedero ({hoveredVehicle.info.cargo.maxLife}h vida)
-                              </p>
-                          )}
+                  {/* Sección Carga (Solo si es camión, pickup o tiene valor) */}
+                  {(hoveredVehicle.type === 'TRUCK' || hoveredVehicle.type === 'PICKUP' || info.cargoValue > 0) && (
+                      <div className="bg-slate-800 p-2.5 rounded border border-slate-600">
+                          <div className="flex justify-between items-start mb-1">
+                              <p className="text-gray-400 flex items-center gap-1.5"><Package size={12}/> Carga</p>
+                              {info.isPerishable && <span className="bg-red-900/50 text-red-300 px-1.5 py-0.5 rounded text-[10px] border border-red-800">Perecedero</span>}
+                          </div>
+                          <p className="font-bold text-white text-sm truncate">{info.cargoName}</p>
+                          <p className="text-emerald-400 font-mono mt-1">Val: Q{info.cargoValue.toLocaleString(undefined, {maximumFractionDigits:0})}</p>
                       </div>
                   )}
 
-                  <div className="flex justify-between items-center">
-                      <span className="text-gray-400 flex items-center gap-2"><Droplets size={12}/> Combustible:</span>
-                      <span className="font-bold">{hoveredVehicle.fuelConsumed ? hoveredVehicle.fuelConsumed.toFixed(4) : 0} gl</span>
-                  </div>
-                  
-                  <div className="flex justify-between items-center border-t border-gray-700 pt-2 mt-2">
-                      <span className="text-gray-400 flex items-center gap-2"><DollarSign size={12}/> Capital Total:</span>
-                      <span className="font-bold text-green-400">Q {hoveredVehicle.info.totalValue?.toLocaleString() || 0}</span>
+                  {/* Total Económico en Riesgo */}
+                  <div className="flex justify-between items-center border-t border-gray-700 pt-2 mt-1">
+                      <span className="text-gray-400 flex items-center gap-1.5">Capital en Riesgo</span>
+                      <span className="font-bold text-emerald-400 text-sm">Q {Math.round(info.totalValue).toLocaleString()}</span>
                   </div>
               </div>
           </div>
@@ -100,14 +134,12 @@ const RoadVisualizer = ({
           <>
             <div className="absolute bottom-8 z-30 flex flex-col items-center" style={{ left: `${(ROAD.STOP_LINE_XELA / ROAD.LENGTH) * 100}%`, transform: 'translateX(-50%)' }}>
                 <div className="bg-black p-1 rounded border border-gray-600 shadow-lg">
-                    {/* Aquí usamos safeTraffic en lugar de trafficState */}
                     <div className={`w-3 h-3 rounded-full mb-1 transition-colors duration-300 ${safeTraffic.lightXela === 'RED' ? 'bg-red-500 shadow-[0_0_10px_red]' : 'bg-red-900'}`}></div>
                     <div className={`w-3 h-3 rounded-full transition-colors duration-300 ${safeTraffic.lightXela === 'GREEN' ? 'bg-green-500 shadow-[0_0_10px_green]' : 'bg-green-900'}`}></div>
                 </div>
             </div>
             <div className="absolute top-8 z-30 flex flex-col-reverse items-center" style={{ left: `${(ROAD.STOP_LINE_REU / ROAD.LENGTH) * 100}%`, transform: 'translateX(-50%)' }}>
                 <div className="bg-black p-1 rounded border border-gray-600 shadow-lg">
-                    {/* Aquí también safeTraffic */}
                     <div className={`w-3 h-3 rounded-full mb-1 transition-colors duration-300 ${safeTraffic.lightReu === 'RED' ? 'bg-red-500 shadow-[0_0_10px_red]' : 'bg-red-900'}`}></div>
                     <div className={`w-3 h-3 rounded-full transition-colors duration-300 ${safeTraffic.lightReu === 'GREEN' ? 'bg-green-500 shadow-[0_0_10px_green]' : 'bg-green-900'}`}></div>
                 </div>
@@ -125,17 +157,22 @@ const RoadVisualizer = ({
         return (
             <div 
                 key={v.uid} 
-                className={`absolute transition-transform duration-100 ease-linear z-20 ${v.color} cursor-pointer`} 
+                className={`absolute transition-transform duration-100 ease-linear z-20 ${v.color} cursor-pointer group`} 
                 style={{ top: `${laneY + overtakeOffset}%`, left: `${(v.x / ROAD.LENGTH) * 100}%`, transform: `translate(-50%, -50%) ${v.direction === 'TO_REU' ? 'scaleX(-1)' : 'scaleX(1)'}`, zIndex: v.isOvertaking ? 40 : 20 }}
+                // EVENTOS MEJORADOS: Mouse y Click
                 onMouseEnter={() => setHoveredVehicle(v)}
                 onMouseLeave={() => setHoveredVehicle(null)}
+                onClick={() => setHoveredVehicle(v)}
             >
-             <div className="relative flex items-center justify-center group">
+             <div className="relative flex items-center justify-center">
                 {renderVehicleBody(v)}
+                {/* Indicadores de estado */}
                 {v.status === 'CRASHED' && <div className="absolute -top-4 left-1/2 -translate-x-1/2 animate-bounce"><Flame size={20} className="text-red-500 fill-orange-500" /></div>}
                 {v.status === 'BROKEN_DOWN' && <div className="absolute -top-4 left-1/2 -translate-x-1/2 animate-pulse"><Wrench size={20} className="text-gray-200 fill-gray-600" /></div>}
                 {v.status === 'STOPPED' && <div className={`absolute w-1.5 h-1.5 bg-red-600 rounded-full shadow-[0_0_8px_red] animate-pulse ${v.direction === 'TO_XELA' ? '-left-2' : '-right-2'}`}></div>}
              </div>
+             {/* Hitbox expandido para facilitar el click */}
+             <div className="absolute -inset-2 bg-transparent rounded-full"></div>
             </div>
         );
       })}
