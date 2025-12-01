@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import * as XLSX from 'xlsx'; 
 import jsPDF from 'jspdf'; 
 import autoTable from 'jspdf-autotable'; 
-import { Play, Pause, RotateCcw, Download, FileText, CloudRain, Activity, DollarSign, ShieldAlert } from 'lucide-react';
+import { Play, Pause, RotateCcw, Download, FileText, CloudRain, Activity, DollarSign, ShieldAlert, Clock } from 'lucide-react';
 import { AreaChart, Area, CartesianGrid, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import RoadVisualizer from './RoadVisualizer';
 import { useSimulationEngine } from '../simulation/engine';
@@ -138,6 +138,21 @@ const Dashboard = () => {
                                   className="bg-slate-200 text-slate-600 rounded-lg font-bold flex justify-center items-center hover:bg-slate-300 shadow-inner">
                               <RotateCcw size={18}/>
                           </button>
+                      </div>
+
+                      {/* --- NUEVO: INPUT HORA INICIO --- */}
+                      <div>
+                          <label className="text-xs font-bold text-slate-400 flex items-center gap-1"><Clock size={12}/> HORA INICIO</label>
+                          <input 
+                              type="time" 
+                              className="w-full mt-1 p-2 bg-slate-50 border rounded-lg text-sm font-bold text-slate-700 focus:ring-2 focus:ring-indigo-500 outline-none"
+                              value={config.startHour}
+                              onChange={(e) => { 
+                                  setIsRunning(false); 
+                                  setConfig({...config, startHour: e.target.value}); 
+                                  setResetCount(c => c+1); // Reiniciar para aplicar la hora
+                              }}
+                          />
                       </div>
 
                       {/* Selector Escenario */}
