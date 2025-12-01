@@ -1,51 +1,44 @@
 // src/components/Dashboard.jsx
 import React, { useState, useEffect } from 'react';
-import { Play, Pause, RefreshCw, CloudRain, Sun, AlertTriangle, Skull, Clock, Calendar, Settings, RotateCcw, Activity } from 'lucide-react';
+import { Play, Pause, AlertTriangle, Skull, Clock, Calendar, Settings, RotateCcw, Activity, ArrowLeft, CloudRain, Sun, Zap, FastForward, Gauge, Wrench, Timer } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area } from 'recharts';
 import RoadVisualizer from './RoadVisualizer';
 import { useSimulationEngine } from '../simulation/engine';
 import { SCENARIOS } from '../simulation/constants';
 
 const Dashboard = () => {
-  // Configuración Editable UI
   const [inputConfig, setInputConfig] = useState({
     startHour: "06:00",
     greenDuration: 400,
     rainIntensity: 0,
-    allowOvertaking: true
+    allowOvertaking: true,
+    timeScale: 1 
   });
 
-  // Estado del Sistema
   const [activeScenario, setActiveScenario] = useState(SCENARIOS.REAL);
   const [isRunning, setIsRunning] = useState(false);
-  const [hasStarted, setHasStarted] = useState(false); // Para controlar inputs
-  const [resetTrigger, setResetTrigger] = useState(0); // Señal para resetear engine
+  const [hasStarted, setHasStarted] = useState(false); 
+  const [resetTrigger, setResetTrigger] = useState(0); 
+  const [viewMode, setViewMode] = useState('DASHBOARD'); 
 
-  // Hook del motor
-  const { vehicles, stats, trafficState, simTime, dayCount, accidentReport } = useSimulationEngine(activeScenario, isRunning, inputConfig, resetTrigger);
-
+  const { vehicles, stats, trafficState, simTime, dayCount, accidentReport, breakdownAlert, accidentHistory } = useSimulationEngine(activeScenario, isRunning, inputConfig, resetTrigger);
   const [chartData, setChartData] = useState([]);
 
-  // Actualizar gráficos - Corregido para fluidez
   useEffect(() => {
-    if (isRunning) {
-      const interval = setInterval(() => {
+    if (isRunning && simTime) {
         setChartData(prev => {
-            const newData = [
-                ...prev,
-                {
-                    time: simTime ? simTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : '',
-                    costo: Math.round(stats.totalCost),
-                    colas: stats.stoppedVehicles
-                }
-            ];
-            // Mantener solo los últimos 20 puntos para movimiento
-            return newData.slice(-30);
+            const newPoint = {
+                time: simTime.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+                costo: Math.round(stats.totalCost),
+                espera: stats.avgWaitTime,
+                velocidad: stats.averageSpeed
+            };
+            const newData = [...prev, newPoint];
+            if (newData.length > 20) newData.shift();
+            return newData;
         });
-      }, 1000);
-      return () => clearInterval(interval);
     }
-  }, [isRunning, stats, simTime]);
+  }, [simTime, isRunning, stats]);
 
   const handleStartToggle = () => {
       if (!hasStarted) setHasStarted(true);
@@ -56,7 +49,8 @@ const Dashboard = () => {
       setIsRunning(false);
       setHasStarted(false);
       setChartData([]);
-      setResetTrigger(prev => prev + 1); // Dispara el useEffect de limpieza en el engine
+      setResetTrigger(prev => prev + 1);
+      setViewMode('DASHBOARD');
   };
 
   const formatTime24h = (date) => {
@@ -64,189 +58,132 @@ const Dashboard = () => {
       return date.toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit', hour12: false });
   };
 
+  if (viewMode === 'ACCIDENT_LOG') {
+      return (
+          <div className="min-h-screen bg-slate-100 p-6 font-sans">
+              <div className="max-w-5xl mx-auto bg-white rounded-xl shadow-lg overflow-hidden">
+                  <header className="bg-slate-800 text-white p-6 flex justify-between items-center">
+                      <div>
+                          <h2 className="text-2xl font-bold flex items-center gap-2"><Skull /> Reporte de Accidentes</h2>
+                          <p className="text-slate-400 text-sm">Registro detallado de incidentes simulados</p>
+                      </div>
+                      <button onClick={() => setViewMode('DASHBOARD')} className="px-4 py-2 bg-slate-600 hover:bg-slate-500 rounded flex items-center gap-2 transition-colors">
+                          <ArrowLeft size={18} /> Volver a Simulación
+                      </button>
+                  </header>
+                  <div className="p-6">
+                      <div className="overflow-x-auto">
+                          <table className="w-full text-left text-sm text-gray-600">
+                              <thead className="bg-gray-100 text-gray-800 uppercase font-bold text-xs">
+                                  <tr>
+                                      <th className="p-3">Hora</th>
+                                      <th className="p-3">Vehículo</th>
+                                      <th className="p-3">Tipo Choque</th>
+                                      <th className="p-3 text-center">Heridos</th>
+                                      <th className="p-3">Carga / Detalle</th>
+                                      <th className="p-3 text-right">Costo Total</th>
+                                  </tr>
+                              </thead>
+                              <tbody className="divide-y divide-gray-200">
+                                  {accidentHistory.length === 0 ? (
+                                      <tr><td colSpan="6" className="p-8 text-center">Sin accidentes registrados</td></tr>
+                                  ) : (accidentHistory.map((acc) => (
+                                      <tr key={acc.id} className="hover:bg-gray-50">
+                                          <td className="p-3 font-mono">{acc.time}</td>
+                                          <td className="p-3 font-bold uppercase">{acc.type}</td>
+                                          <td className="p-3 text-xs">{acc.collisionType}</td>
+                                          <td className="p-3 text-center text-red-600">{acc.details.injured}</td>
+                                          <td className="p-3">{acc.type === 'TRUCK' ? acc.details.cargoDesc : 'N/A'}</td>
+                                          <td className="p-3 text-right font-bold">Q {Math.round(acc.details.materialLoss + acc.details.cargoLoss).toLocaleString()}</td>
+                                      </tr>
+                                  )))}
+                              </tbody>
+                          </table>
+                      </div>
+                  </div>
+              </div>
+          </div>
+      );
+  }
+
   return (
     <div className="min-h-screen bg-slate-100 p-6 font-sans">
-      
-      {/* HEADER con Alerta de Accidentes */}
-      <header className="mb-6 flex flex-col md:flex-row justify-between items-center bg-white p-4 rounded-xl shadow-sm border-l-8 border-blue-600 relative overflow-hidden gap-4">
-        
-        {/* OVERLAY DE ALERTA DE ACCIDENTE */}
-        {accidentReport && accidentReport.active && (
-            <div className="absolute inset-0 bg-red-600 text-white flex items-center justify-center animate-pulse z-50">
-                <Skull className="mr-4" size={32}/>
-                <div className="text-center">
-                    <h2 className="text-2xl font-black uppercase tracking-widest">¡ACCIDENTE REGISTRADO!</h2>
-                    <p className="text-sm font-bold">Vehículo: {accidentReport.lastType} — Tráfico Detenido</p>
-                </div>
-            </div>
-        )}
+      {/* ALERTAS VISUALES */}
+      {accidentReport && (
+          <div className="fixed top-24 left-1/2 transform -translate-x-1/2 bg-red-600 text-white px-8 py-4 rounded-xl shadow-2xl z-50 animate-bounce flex items-center gap-4 border-4 border-red-800">
+              <Skull size={32} />
+              <div><h3 className="font-black text-xl uppercase">¡Accidente!</h3><p className="text-sm font-bold">Vehículo: {accidentReport.lastType}</p></div>
+          </div>
+      )}
+      {breakdownAlert && (
+          <div className="fixed top-40 left-1/2 transform -translate-x-1/2 bg-orange-500 text-white px-8 py-4 rounded-xl shadow-2xl z-50 animate-pulse flex items-center gap-4 border-4 border-orange-700">
+              <Wrench size={32} />
+              <div><h3 className="font-black text-xl uppercase">Falla Mecánica</h3><p className="text-sm font-bold">Vehículo averiado en pendiente: {breakdownAlert.type}</p></div>
+          </div>
+      )}
 
+      <header className="mb-6 flex flex-col md:flex-row justify-between items-center bg-white p-4 rounded-xl shadow-sm border-l-8 border-indigo-600 gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">Simulador de Impacto Vial - Km 194</h1>
+          <h1 className="text-2xl font-bold text-gray-800">Simulador Cito-Zarco Km 194</h1>
           <div className="flex gap-4 mt-2 text-sm text-gray-500">
-             {/* Datos Relevantes en Header */}
-             <div className="flex items-center gap-2 bg-slate-800 text-green-400 px-3 py-1 rounded font-mono shadow-inner">
-                <Clock size={14}/> {formatTime24h(simTime)}
-             </div>
-             <div className="flex items-center gap-2 bg-gray-100 px-3 py-1 rounded font-bold text-orange-600">
-                <Calendar size={14}/> DÍA {dayCount}
-             </div>
-             <div className="flex items-center gap-2 bg-gray-100 px-3 py-1 rounded font-bold text-blue-600">
-                <Activity size={14}/> Activos: {vehicles.length}
-             </div>
-             {accidentReport && (
-                 <div className="flex items-center gap-2 bg-red-100 px-3 py-1 rounded font-bold text-red-600 border border-red-200">
-                    <Skull size={14}/> Accidentes: {accidentReport.count}
-                 </div>
-             )}
+             <div className="flex items-center gap-2 bg-slate-800 text-green-400 px-3 py-1 rounded font-mono shadow-inner"><Clock size={14}/> {formatTime24h(simTime)}</div>
+             <div className="flex items-center gap-2 bg-gray-100 px-3 py-1 rounded font-bold text-orange-600"><Calendar size={14}/> DÍA {dayCount}</div>
+             <button onClick={() => setViewMode('ACCIDENT_LOG')} className={`flex items-center gap-2 px-3 py-1 rounded font-bold transition-all border ${accidentHistory.length > 0 ? 'bg-red-100 text-red-600 border-red-200' : 'bg-gray-100 text-gray-400 border-gray-200'}`}>
+                <Skull size={14}/> Accidentes: {accidentHistory.length}
+             </button>
           </div>
         </div>
-
         <div className="flex gap-4 items-center">
+             <div className="flex bg-gray-100 rounded-lg p-1 border border-gray-200">
+                 <button onClick={() => setInputConfig({...inputConfig, timeScale: 0.5})} className={`px-2 py-1 text-xs font-bold rounded ${inputConfig.timeScale === 0.5 ? 'bg-white text-blue-600' : 'text-gray-400'}`}>0.5x</button>
+                 <button onClick={() => setInputConfig({...inputConfig, timeScale: 1})} className={`px-2 py-1 text-xs font-bold rounded ${inputConfig.timeScale === 1 ? 'bg-white text-blue-600' : 'text-gray-400'}`}>1x</button>
+                 <button onClick={() => setInputConfig({...inputConfig, timeScale: 2})} className={`px-2 py-1 text-xs font-bold rounded ${inputConfig.timeScale === 2 ? 'bg-white text-blue-600' : 'text-gray-400'}`}>2x</button>
+             </div>
             <div className={`px-4 py-2 rounded font-bold text-white flex items-center gap-2 shadow ${trafficState.phase === 'DESPEJE' ? 'bg-orange-500 animate-pulse' : 'bg-slate-700'}`}>
                 {trafficState.phase === 'DESPEJE' ? <><AlertTriangle size={16}/> DESPEJE</> : trafficState.phase}
             </div>
-            
-            <button 
-                onClick={handleReset}
-                className="px-4 py-2 bg-white text-red-600 hover:bg-red-50 rounded border border-red-200 flex items-center gap-2 font-bold shadow-sm transition-colors"
-            >
-                <RotateCcw size={16}/> REINICIAR
-            </button>
+            <button onClick={handleReset} className="px-4 py-2 bg-white text-red-600 hover:bg-red-50 rounded border border-red-200 flex items-center gap-2 font-bold shadow-sm"><RotateCcw size={16}/> REINICIAR</button>
         </div>
       </header>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        
-        {/* PANEL DE CONTROL */}
         <div className="lg:col-span-3 space-y-4">
           <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-100">
-            <h3 className="font-bold text-gray-700 mb-4 flex items-center gap-2 border-b pb-2">
-                <Settings size={18} /> Configuración
-            </h3>
-            
+            <h3 className="font-bold text-gray-700 mb-4 flex items-center gap-2 border-b pb-2"><Settings size={18} /> Configuración</h3>
             <div className="space-y-4">
-                {/* Hora Inicio (Editable solo si no ha comenzado) */}
-                <div>
-                    <label className="text-xs font-bold text-gray-500">HORA INICIO (24H)</label>
-                    <input 
-                        type="time" 
-                        disabled={hasStarted} // Solo se bloquea al darle Iniciar por primera vez
-                        className={`w-full mt-1 p-2 border rounded font-mono ${hasStarted ? 'bg-gray-100 text-gray-400' : 'bg-white text-gray-800 border-blue-300'}`}
-                        value={inputConfig.startHour}
-                        onChange={(e) => setInputConfig({...inputConfig, startHour: e.target.value})}
-                    />
-                </div>
-
-                {/* Controles Dinámicos */}
-                <div>
-                    <label className="text-xs font-bold text-gray-500 flex justify-between">
-                        <span>LLUVIA ({inputConfig.rainIntensity})</span>
-                        {inputConfig.rainIntensity > 5 ? <CloudRain size={14} className="text-blue-500"/> : <Sun size={14} className="text-yellow-500"/>}
-                    </label>
-                    <input 
-                        type="range" min="0" max="10" 
-                        className="w-full mt-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                        value={inputConfig.rainIntensity}
-                        onChange={(e) => setInputConfig({...inputConfig, rainIntensity: parseInt(e.target.value)})}
-                    />
-                </div>
-
-                <div className="flex items-center gap-2 bg-gray-50 p-2 rounded border">
-                    <input 
-                        type="checkbox" 
-                        id="overtake"
-                        checked={inputConfig.allowOvertaking}
-                        onChange={(e) => setInputConfig({...inputConfig, allowOvertaking: e.target.checked})}
-                        className="w-4 h-4 text-blue-600 rounded"
-                    />
-                    <label htmlFor="overtake" className="text-sm text-gray-700 font-medium select-none cursor-pointer">Permitir Rebasar</label>
-                </div>
-
-                <div>
-                    <label className="text-xs font-bold text-gray-500">ESCENARIO</label>
-                    <select 
-                        className="w-full mt-1 p-2 border rounded-lg bg-gray-50 text-sm"
-                        value={activeScenario.id}
-                        onChange={(e) => {
-                            handleReset(); // Cambiar escenario reinicia para evitar bugs físicos
-                            setActiveScenario(SCENARIOS[e.target.value]);
-                        }}
-                    >
-                        {Object.values(SCENARIOS).map(sc => (
-                            <option key={sc.id} value={sc.id}>{sc.name}</option>
-                        ))}
-                    </select>
-                </div>
-
-                <button
-                    onClick={handleStartToggle}
-                    className={`w-full py-3 rounded-lg font-bold text-white flex items-center justify-center gap-2 transition-all shadow-md ${isRunning ? 'bg-amber-500 hover:bg-amber-600' : 'bg-emerald-600 hover:bg-emerald-700'}`}
-                >
-                    {isRunning ? <><Pause size={20} /> PAUSAR</> : <><Play size={20} /> {hasStarted ? 'CONTINUAR' : 'INICIAR'}</>}
-                </button>
+                <div><label className="text-xs font-bold text-gray-500">HORA INICIO (24H)</label><input type="time" disabled={hasStarted} className="w-full mt-1 p-2 border rounded font-mono" value={inputConfig.startHour} onChange={(e) => setInputConfig({...inputConfig, startHour: e.target.value})} /></div>
+                <div><label className="text-xs font-bold text-gray-500 flex justify-between"><span>LLUVIA ({inputConfig.rainIntensity})</span>{inputConfig.rainIntensity > 5 ? <CloudRain size={14} className="text-blue-500"/> : <Sun size={14} className="text-yellow-500"/>}</label><input type="range" min="0" max="10" className="w-full mt-1 h-2 bg-gray-200 rounded-lg cursor-pointer" value={inputConfig.rainIntensity} onChange={(e) => setInputConfig({...inputConfig, rainIntensity: parseInt(e.target.value)})} /></div>
+                <div className="flex items-center gap-2 bg-gray-50 p-2 rounded border"><input type="checkbox" checked={inputConfig.allowOvertaking} onChange={(e) => setInputConfig({...inputConfig, allowOvertaking: e.target.checked})} className="w-4 h-4" /><label className="text-sm text-gray-700 font-medium">Permitir Rebasar</label></div>
+                <div><label className="text-xs font-bold text-gray-500">ESCENARIO</label><select className="w-full mt-1 p-2 border rounded-lg bg-gray-50 text-sm" value={activeScenario.id} onChange={(e) => { handleReset(); setActiveScenario(SCENARIOS[e.target.value]); }}>{Object.values(SCENARIOS).map(sc => (<option key={sc.id} value={sc.id}>{sc.name}</option>))}</select></div>
+                <button onClick={handleStartToggle} className={`w-full py-3 rounded-lg font-bold text-white flex items-center justify-center gap-2 shadow-md ${isRunning ? 'bg-amber-500 hover:bg-amber-600' : 'bg-emerald-600 hover:bg-emerald-700'}`}>{isRunning ? <><Pause size={20} /> PAUSAR</> : <><Play size={20} /> {hasStarted ? 'CONTINUAR' : 'INICIAR'}</>}</button>
             </div>
           </div>
-
           <div className="bg-white p-5 rounded-xl shadow-sm border-t-4 border-indigo-500">
-            <h3 className="font-bold text-gray-700 mb-2 text-sm">KPIs Económicos</h3>
+            <h3 className="font-bold text-gray-700 mb-2 text-sm">KPIs Económicos (Acumulado)</h3>
             <div className="space-y-3">
-                <div className="flex justify-between items-end">
-                    <span className="text-xs text-gray-500">Pérdida Acumulada</span>
-                    <span className="text-xl font-black text-indigo-700">Q {stats.totalCost.toFixed(0)}</span>
-                </div>
-                <div className="grid grid-cols-2 gap-2 pt-2 border-t">
-                    <div>
-                        <p className="text-[10px] text-gray-500">Combustible</p>
-                        <p className="font-bold">{stats.fuelConsumed.toFixed(1)} Gal</p>
-                    </div>
-                    <div>
-                        <p className="text-[10px] text-gray-500">Colas (Veh)</p>
-                        <p className="font-bold text-red-600">{stats.stoppedVehicles}</p>
-                    </div>
+                <div className="flex justify-between items-end"><span className="text-xs text-gray-500">Costo Total</span><span className="text-xl font-black text-indigo-700">Q {stats.totalCost.toFixed(0)}</span></div>
+                <div className="pt-2 border-t text-xs">
+                    <div className="flex justify-between text-gray-600"><span>Combustible:</span> <span className="font-bold">Q {stats.fuelCost.toFixed(0)}</span></div>
+                    <div className="flex justify-between text-orange-600"><span>Oportunidad/Carga:</span> <span className="font-bold">Q {stats.cargoCost.toFixed(0)}</span></div>
                 </div>
             </div>
           </div>
         </div>
 
-        {/* VISUALIZACIÓN */}
         <div className="lg:col-span-9 space-y-6">
-            <RoadVisualizer 
-                vehicles={vehicles} 
-                trafficState={trafficState} 
-                weatherIntensity={inputConfig.rainIntensity}
-                scenarioMode={activeScenario.id}
-            />
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 h-64">
+            <RoadVisualizer vehicles={vehicles} trafficState={trafficState} weatherIntensity={inputConfig.rainIntensity} scenarioMode={activeScenario.id} />
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 h-64">
                 <div className="bg-white p-4 rounded-xl shadow-sm">
-                    <h4 className="font-bold text-gray-700 text-xs mb-4 uppercase flex items-center gap-2">
-                        <Activity size={14}/> Costo Operativo (Tiempo Real)
-                    </h4>
-                    <ResponsiveContainer width="100%" height="80%">
-                        <AreaChart data={chartData}>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                            <XAxis dataKey="time" hide />
-                            <YAxis tick={{fontSize: 10}} width={40} />
-                            <Tooltip contentStyle={{fontSize: '12px'}} />
-                            <Area type="monotone" dataKey="costo" stroke="#4f46e5" fill="#e0e7ff" isAnimationActive={false} />
-                        </AreaChart>
-                    </ResponsiveContainer>
+                    <h4 className="font-bold text-gray-700 text-xs mb-4 uppercase flex items-center gap-2"><Activity size={14}/> Costo Operativo</h4>
+                    <ResponsiveContainer width="100%" height="80%"><AreaChart data={chartData}><CartesianGrid strokeDasharray="3 3" vertical={false}/><YAxis tick={{fontSize: 9}} width={35}/><Tooltip contentStyle={{fontSize: '11px'}}/><Area type="monotone" dataKey="costo" stroke="#4f46e5" fill="#e0e7ff" isAnimationActive={false}/></AreaChart></ResponsiveContainer>
                 </div>
-
                 <div className="bg-white p-4 rounded-xl shadow-sm">
-                    <h4 className="font-bold text-gray-700 text-xs mb-4 uppercase flex items-center gap-2">
-                        <AlertTriangle size={14}/> Congestión (Vehículos Detenidos)
-                    </h4>
-                    <ResponsiveContainer width="100%" height="80%">
-                        <LineChart data={chartData}>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
-                            <XAxis dataKey="time" hide />
-                            <YAxis tick={{fontSize: 10}} width={30} allowDecimals={false} />
-                            <Tooltip contentStyle={{fontSize: '12px'}} />
-                            <Line type="step" dataKey="colas" stroke="#ef4444" strokeWidth={2} dot={false} isAnimationActive={false} />
-                        </LineChart>
-                    </ResponsiveContainer>
+                    <h4 className="font-bold text-gray-700 text-xs mb-4 uppercase flex items-center gap-2"><Timer size={14}/> Tiempo Espera Prom.</h4>
+                    <ResponsiveContainer width="100%" height="80%"><AreaChart data={chartData}><CartesianGrid strokeDasharray="3 3" vertical={false}/><YAxis tick={{fontSize: 9}} width={30}/><Tooltip contentStyle={{fontSize: '11px'}}/><Area type="monotone" dataKey="espera" stroke="#f59e0b" fill="#fef3c7" isAnimationActive={false}/></AreaChart></ResponsiveContainer>
+                </div>
+                <div className="bg-white p-4 rounded-xl shadow-sm">
+                    <h4 className="font-bold text-gray-700 text-xs mb-4 uppercase flex items-center gap-2"><Gauge size={14}/> Velocidad Prom. (km/h)</h4>
+                    <ResponsiveContainer width="100%" height="80%"><LineChart data={chartData}><CartesianGrid strokeDasharray="3 3" vertical={false}/><YAxis tick={{fontSize: 9}} width={30} domain={[0, 90]}/><Tooltip contentStyle={{fontSize: '11px'}}/><Line type="monotone" dataKey="velocidad" stroke="#10b981" strokeWidth={2} dot={false} isAnimationActive={false}/></LineChart></ResponsiveContainer>
                 </div>
             </div>
         </div>
